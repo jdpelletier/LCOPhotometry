@@ -6,6 +6,7 @@ import math
 import subprocess
 import datetime
 import time
+import logging
 
 import numpy as np
 from astropy.io import fits
@@ -18,30 +19,30 @@ from photutils.aperture import aperture_photometry, CircularAperture, CircularAn
 
 from ginga import Bindings
 from ginga.misc import log
-from ginga.qtw.QtHelp import QtGui, QtCore
-from ginga.qtw.ImageViewQt import CanvasView, ScrolledView
+from ginga.web.pgw import Widgets, Viewers
 from ginga.util import iqcalc
 from ginga.util.loader import load_data
 
-class FitsViewer(QtGui.QMainWindow):
+class FitsViewer(object):
 
-    def __init__(self, logger, MainWindow):
-        super(FitsViewer, self).__init__()
+    def __init__(self, logger, window):
         self.logger = logger
 
         self.rawfile = ''
 
         self.iqcalc = iqcalc.IQCalc(self.logger)
-        MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(700, 900)
+        self.top = window
+        self.top.add_callback('close', self.closed)
+
+        vbox = Widgets.VBox()
+        vbox.set_margins(2, 2, 2, 2)
+        vbox.set_spacing(1)
 
         # create the ginga viewer and configure it
-        fi = CanvasView(self.logger, render='widget')
+        fi = Viewers.CanvasView(logger)
         fi.enable_autocuts('on')
         fi.set_autocut_params('zscale')
         fi.enable_autozoom('on')
-        fi.set_zoom_algorithm('rate')
-        fi.set_zoomrate(1.4)
         # fi.set_callback('drag-drop', self.drop_file)
         fi.set_bg(0.2, 0.2, 0.2)
         fi.ui_set_active(True)
@@ -50,82 +51,107 @@ class FitsViewer(QtGui.QMainWindow):
         # enable some user interaction
         self.bd = fi.get_bindings()
         self.bd.enable_all(True)
-        self.centralwidget = QtGui.QWidget(MainWindow)
-        self.centralwidget.setObjectName("centralwidget")
-        self.horizontalLayoutWidget = QtGui.QWidget(self.centralwidget)
-        self.horizontalLayoutWidget.setGeometry(QtCore.QRect(9, 9, 681, 641))
-        self.horizontalLayoutWidget.setObjectName("horizontalLayoutWidget")
-        self.image_display_hbox = QtGui.QHBoxLayout(self.horizontalLayoutWidget)
-        self.image_display_hbox.setContentsMargins(0, 0, 0, 0)
-        self.image_display_hbox.setObjectName("image_display_hbox")
-        w = fi.get_widget()
-        w.setObjectName("w")
-        self.image_display_hbox.addWidget(w, stretch=1)
-        self.targ_info = QtGui.QLabel(self.centralwidget)
-        self.targ_info.setGeometry(QtCore.QRect(150, 720, 251, 31))
-        self.targ_info.setObjectName("targ_info")
-        self.targ_info.setText("Target Instrument Mag: ")
-        self.companion_info = QtGui.QLabel(self.centralwidget)
-        self.companion_info.setGeometry(QtCore.QRect(120, 760, 281, 31))
-        self.companion_info.setObjectName("companion_info")
-        self.companion_info.setText("Companion Instrument Mag:")
-        self.target_mag = QtGui.QLabel(self.centralwidget)
-        self.target_mag.setGeometry(QtCore.QRect(180, 800, 221, 31))
-        self.target_mag.setObjectName("target_mag")
-        self.target_mag.setText("Target Magnitude: ")
-        self.image_info = QtGui.QLabel(self.centralwidget)
-        self.image_info.setGeometry(QtCore.QRect(20, 660, 171, 31))
-        self.image_info.setObjectName("image_info")
-        self.image_info.setText("Image: ")
-        self.ann_readout = QtGui.QLabel(self.centralwidget)
-        self.ann_readout.setGeometry(QtCore.QRect(410, 690, 111, 31))
-        self.ann_readout.setObjectName("ann_readout")
-        self.ann_readout.setText("Sum: ")
-        self.cursorReadout = QtGui.QLabel(self.centralwidget)
-        self.cursorReadout.setGeometry(QtCore.QRect(20, 690, 291, 31))
-        self.cursorReadout.setObjectName("cursorReadout")
-        self.cursorReadout.setText("X:                 Y:                    Value:")
-        self.wsettarget = QtGui.QPushButton(self.centralwidget)
-        self.wsettarget.setGeometry(QtCore.QRect(10, 720, 101, 28))
-        self.wsettarget.setObjectName("wsettarget")
-        self.wsettarget.clicked.connect(self.set_target)
-        self.wopen = QtGui.QPushButton(self.centralwidget)
-        self.wopen.setGeometry(QtCore.QRect(590, 720, 93, 28))
-        self.wopen.setObjectName("wopen")
-        self.wopen.clicked.connect(self.open_file)
-        self.wquit = QtGui.QPushButton(self.centralwidget)
-        self.wquit.setGeometry(QtCore.QRect(590, 810, 93, 28))
-        self.wquit.setObjectName("wquit")
-        self.wquit.clicked.connect(QtGui.QApplication.instance().quit)
-        self.wcalculatemag = QtGui.QPushButton(self.centralwidget)
-        self.wcalculatemag.setGeometry(QtCore.QRect(10, 800, 101, 41))
-        self.wcalculatemag.setObjectName("wcalculatemag")
-        self.wcalculatemag.clicked.connect(self.calc_mag)
-        self.wsubtractimage = QtGui.QPushButton(self.centralwidget)
-        self.wsubtractimage.setGeometry(QtCore.QRect(590, 760, 93, 41))
-        self.wsubtractimage.setObjectName("wsubtractimage")
-        self.wsubtractimage.clicked.connect(self.subtract_image)
-        self.wsetcompanion = QtGui.QPushButton(self.centralwidget)
-        self.wsetcompanion.setGeometry(QtCore.QRect(10, 760, 101, 28))
-        self.wsetcompanion.setObjectName("wsetcompanion")
-        self.wsetcompanion.clicked.connect(self.set_companion)
-        self.wcut = QtGui.QComboBox(self.centralwidget)
-        self.wcut.setGeometry(QtCore.QRect(300, 660, 73, 22))
-        self.wcut.setObjectName("wcut")
+
+        fi.set_desired_size(512, 512)
+        w = Viewers.GingaViewerWidget(viewer=fi)
+        vbox.add_widget(w, stretch=1)
+
+        hbox = Widgets.HBox()
+        hbox.set_margins(2, 2, 2, 2)
+        hbox.set_spacing(4)
+
+        self.image_info = Widgets.Label("Image: ")
+        hbox.add_widget(self.image_info, stretch=1)
+
+        self.wcut = Widgets.ComboBox()
         for name in fi.get_autocut_methods():
-            self.wcut.addItem(name)
-        self.wcut.currentIndexChanged.connect(self.cut_change)
-        self.wcolor = QtGui.QComboBox(self.centralwidget)
-        self.wcolor.setGeometry(QtCore.QRect(480, 660, 73, 22))
-        self.wcolor.setObjectName("wcolor")
+            self.wcut.append_text(name)
+        self.wcut.add_callback('activated', self.cut_change)
+        hbox.add_widget(self.wcut, stretch=1)
+
+        self.wcolor = Widgets.ComboBox()
         for name in fi.get_color_algorithms():
-            self.wcolor.addItem(name)
-        self.wcolor.currentIndexChanged.connect(self.color_change)
+            self.wcolor.append_text(name)
+        self.wcolor.add_callback('activated', self.color_change)
+        hbox.add_widget(self.wcolor, stretch=1)
 
-        MainWindow.setCentralWidget(self.centralwidget)
+        vbox.add_widget(hbox, stretch=0)
 
-        self.retranslateUi(MainWindow)
-        QtCore.QMetaObject.connectSlotsByName(MainWindow)
+        hbox = Widgets.HBox()
+        hbox.set_margins(2, 2, 2, 2)
+        hbox.set_spacing(4)
+
+        self.cursorReadout = Widgets.Label("X:                 Y:                    Value:")
+        hbox.add_widget(self.cursorReadout, stretch=1)
+
+        self.ann_readout = Widgets.Label("Sum: ")
+        hbox.add_widget(self.ann_readout, stretch=1)
+
+        vbox.add_widget(hbox, stretch=0)
+
+        hbox = Widgets.HBox()
+        hbox.set_margins(2, 2, 2, 2)
+        hbox.set_spacing(4)
+
+        vbox_b = Widgets.VBox()
+        vbox_b.set_margins(2, 2, 2, 2)
+        vbox_b.set_spacing(1)
+
+        self.wsettarget = Widgets.Button("Set Target")
+        self.wsettarget.add_callback('activated', self.set_target)
+        vbox_b.add_widget(self.wsettarget, stretch=1)
+
+        self.wsetcompanion = Widgets.Button("Set Companion")
+        self.wsetcompanion.add_callback('activated', self.set_companion)
+        vbox_b.add_widget(self.wsetcompanion, stretch=1)
+
+        self.wcalculatemag = Widgets.Button("Calculate\n"
+"Magnitude")
+        self.wcalculatemag.add_callback('activated', self.calc_mag)
+        vbox_b.add_widget(self.wcalculatemag, stretch=1)
+
+        hbox.add_widget(vbox_b, stretch=1)
+
+        vbox_b = Widgets.VBox()
+        vbox_b.set_margins(2, 2, 2, 2)
+        vbox_b.set_spacing(1)
+
+        self.targ_info = Widgets.Label("Target Instrument Mag: ")
+        vbox_b.add_widget(self.targ_info, stretch=1)
+
+        self.companion_info = Widgets.Label("Companion Instrument Mag: ")
+        vbox_b.add_widget(self.companion_info, stretch=1)
+
+        self.target_mag = Widgets.Label("Target Magnitude: ")
+        vbox_b.add_widget(self.target_mag, stretch=1)
+
+        hbox.add_widget(vbox_b, stretch=1)
+
+        vbox_b = Widgets.VBox()
+        vbox_b.set_margins(2, 2, 2, 2)
+        vbox_b.set_spacing(1)
+
+        self.wopendirectory = Widgets.Button("Open Directory")
+        # self.wopendirectory.add_callback('activated', self.open_directory)
+        vbox_b.add_widget(self.wopendirectory, stretch=1)
+
+        self.wnextimage = Widgets.Button("Next Image >")
+        # self.wnextimage.add_callback('activated', self.open_file)
+        vbox_b.add_widget(self.wnextimage, stretch=1)
+
+        self.wpreviousimage = Widgets.Button("< Previous Image")
+        # self.wpreviousimage.add_callback('activated', self.open_file)
+        vbox_b.add_widget(self.wpreviousimage, stretch=1)
+
+        hbox.add_widget(vbox_b, stretch=1)
+
+        vbox.add_widget(hbox, stretch=0)
+
+        hbox = Widgets.HBox()
+        hbox.add_widget(vbox, stretch=0)
+        hbox.add_widget(Widgets.Label(''), stretch=1)
+
+        self.top.set_widget(hbox)
 
         fi.set_callback('cursor-changed', self.motion_cb)
         fi.add_callback('cursor-down', self.btndown)
@@ -137,25 +163,8 @@ class FitsViewer(QtGui.QMainWindow):
         self.anncomptag = "companion-annulus-tag"
         self.circcomptag = "companion-circle-tag"
 
-    def retranslateUi(self, MainWindow):
-        _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
-        self.targ_info.setText(_translate("MainWindow", "Target Instrument Mag:"))
-        self.companion_info.setText(_translate("MainWindow", "Companion Instrument Mag:"))
-        self.target_mag.setText(_translate("MainWindow", "Target Magnitude:"))
-        self.image_info.setText(_translate("MainWindow", "Image: "))
-        self.ann_readout.setText(_translate("MainWindow", "Sum: "))
-        self.cursorReadout.setText(_translate("MainWindow", "X:                 Y:                    Value:"))
-        self.wsettarget.setText(_translate("MainWindow", "Set Target"))
-        self.wopen.setText(_translate("MainWindow", "Open File"))
-        self.wquit.setText(_translate("MainWindow", "Quit"))
-        self.wcalculatemag.setText(_translate("MainWindow", "Calculate\n"
-"Magnitude"))
-        self.wsubtractimage.setText(_translate("MainWindow", "Subtract\n"
-"Image"))
-        self.wsetcompanion.setText(_translate("MainWindow", "Set Companion"))
-
-
+        #TODO remove this when open works
+        self.load_file("20220502r.fits.fz")
 
     def add_canvas(self, tag=None):
         # add a canvas to the view
@@ -179,26 +188,28 @@ class FitsViewer(QtGui.QMainWindow):
         #                                fontsize=8))
         self.bd._orient(self.fitsimage, righthand=False, msg=True)
 
-    def open_file(self):
-        res = QtGui.QFileDialog.getOpenFileName(self, "Open FITS file",
-                                                '')
+    def open_directory(self):
+        ##TODO THIS
+        # res = QtGui.QFileDialog.getOpenFileName(self, "Open FITS file",
+        #                                         '')
+        #
+        # if isinstance(res, tuple):
+        #     fileName = res[0]
+        # else:
+        #     fileName = str(res)
+        # if len(fileName) != 0:
+        #     self.load_file(fileName)
+        #     fn = os.path.basename(fileName)
+        #     text = f"Image: {fn}"
+        #     self.image_info.set_text(text)
+        return
 
-        if isinstance(res, tuple):
-            fileName = res[0]
-        else:
-            fileName = str(res)
-        if len(fileName) != 0:
-            self.load_file(fileName)
-            fn = os.path.basename(fileName)
-            text = f"Image: {fn}"
-            self.image_info.setText(text)
 
+    def cut_change(self, activated, idx):
+        self.fitsimage.set_autocut_params(self.wcut.get_text())
 
-    def cut_change(self):
-        self.fitsimage.set_autocut_params(self.wcut.currentText())
-
-    def color_change(self):
-        self.fitsimage.set_color_algorithm(self.wcolor.currentText())
+    def color_change(self, one, two):
+        self.fitsimage.set_color_algorithm(self.wcolor.get_text())
 
     def motion_cb(self, viewer, button, data_x, data_y):
 
@@ -232,7 +243,7 @@ class FitsViewer(QtGui.QMainWindow):
             text = "X: %.2f            Y: %.2f               Value: %s" % (fits_x, fits_y, value)
         else:
             text = "X: %.2f  Y: %.2f  Value: %.2f" % (fits_x, fits_y, float(value))
-        self.cursorReadout.setText(text)
+        self.cursorReadout.set_text(text)
 
 
     def writeFits(self, headerinfo, image_data):
@@ -288,7 +299,6 @@ class FitsViewer(QtGui.QMainWindow):
         # print(back_table)
         apers = [aperture, annulus_aperture]
         phot_table = aperture_photometry(image, apers)
-        print(phot_table)
         bkg_mean = phot_table['aperture_sum_1'] / annulus_aperture.area
         bkg_sum = bkg_mean * aperture.area
         final_sum = phot_table['aperture_sum_0'] - bkg_sum
@@ -320,19 +330,19 @@ class FitsViewer(QtGui.QMainWindow):
             sum = self.staraperature(self.xclick, self.yclick, image.get_data())
             text = f"Sum: {sum:.2f}"
             self.app_sum = sum
-            self.ann_readout.setText(text)
+            self.ann_readout.set_text(text)
         except IndexError:
             text = "Sum: N/A"
-            self.ann_readout.setText(text)
+            self.ann_readout.set_text(text)
 
-    def set_target(self):
+    def set_target(self, clicked):
         try:
             target_sum = self.app_sum
         except AttributeError:
             return
         self.targ_mag = -2.5*np.log10(target_sum/90.)
-        text = f"Sum: {self.targ_mag:.2f}"
-        self.targ_info.setText(text)
+        text = f"Target Sum: {self.targ_mag:.2f}"
+        self.targ_info.set_text(text)
         try:
             self.fitsimage.get_canvas().get_object_by_tag(self.anntargtag)
             self.fitsimage.get_canvas().delete_object_by_tag(self.anntargtag)
@@ -348,14 +358,14 @@ class FitsViewer(QtGui.QMainWindow):
             self.fitsimage.get_canvas().add(self.picktargcircle, tag=self.circtargtag, redraw=True)
             self.fitsimage.get_canvas().add(self.picktargannulus, tag=self.anntargtag, redraw=True)
 
-    def set_companion(self):
+    def set_companion(self, clicked):
         try:
             companion_sum = self.app_sum
         except AttributeError:
             return
         self.comp_mag = -2.5*np.log10(companion_sum/90.)
         text = f"Companion Sum: {self.comp_mag:.2f}"
-        self.companion_info.setText(text)
+        self.companion_info.set_text(text)
         try:
             self.fitsimage.get_canvas().get_object_by_tag(self.anncomptag)
             self.fitsimage.get_canvas().delete_object_by_tag(self.anncomptag)
@@ -371,32 +381,14 @@ class FitsViewer(QtGui.QMainWindow):
             self.fitsimage.get_canvas().add(self.pickcompcircle, tag=self.circcomptag, redraw=True)
             self.fitsimage.get_canvas().add(self.pickcompannulus, tag=self.anncomptag, redraw=True)
 
-    def calc_mag(self):
+    def calc_mag(self, clicked):
         try:
             diff = self.targ_mag-self.comp_mag
         except AttributeError:
             return
         mag = diff + 11.8
         text = f"Target Magnitude: {mag:.2f}"
-        self.target_mag.setText(text)
-
-    def subtract_image(self):
-        res = QtGui.QFileDialog.getOpenFileName(self, "Open background file",
-                                                '')
-        if isinstance(res, tuple):
-            fileName = res[0]
-        else:
-            fileName = str(res)
-        if len(fileName) != 0:
-            self.subtract_sky(fileName)
-
-    def subtract_sky(self, filename):
-        targetData = fits.getdata(self.rawfile)
-        header = fits.getheader(self.rawfile)
-        skyData = fits.getdata(filename)
-        with_sky = targetData - skyData
-        self.load_file(self.writeFits(header, with_sky))
-
+        self.target_mag.set_text(text)
 
     def btndown(self, canvas, event, data_x, data_y):
         # self.fitsimage.set_pan(data_x, data_y)
@@ -404,21 +396,92 @@ class FitsViewer(QtGui.QMainWindow):
         self.yclick = data_y
         self.pickstar()
 
+    def closed(self, w):
+        self.logger.info("Top window closed.")
+        w.delete()
+        self.top = None
+        sys.exit()
 
-def main():
-    ##Write dummy file so walkDirectory caches it in the beginning
 
-    app = QtGui.QApplication([])
+def main(options, args):
 
     # ginga needs a logger.
     # If you don't want to log anything you can create a null logger by
     # using null=True in this call instead of log_stderr=True
     logger = log.get_logger("example1", log_stderr=True, level=40)
 
-    MainWindow = QtGui.QMainWindow()
-    w = FitsViewer(logger, MainWindow)
-    MainWindow.show()
-    sys.exit(app.exec_())
+    app = Widgets.Application(logger=logger,
+                              host=options.host, port=options.port)
+
+    window = app.make_window("Ginga web example2")
+
+    # our own viewer object, customized with methods (see above)
+    viewer = FitsViewer(logger, window)
+
+    if options.renderer is not None:
+        render_class = render.get_render_class(options.renderer)
+        viewer.fitsimage.set_renderer(render_class(viewer.fitsimage))
+
+    window.resize(700, 900)
+
+    if len(args) > 0:
+        viewer.load_file(args[0])
+
+    #window.show()
+    #window.raise_()
+
+    try:
+        app.mainloop()
+
+    except KeyboardInterrupt:
+        logger.info("Terminating viewer...")
+        window.close()
 
 if __name__ == "__main__":
-    main()
+    from argparse import ArgumentParser
+
+    argprs = ArgumentParser()
+
+    argprs.add_argument("--debug", dest="debug", default=False, action="store_true",
+                        help="Enter the pdb debugger on main()")
+    argprs.add_argument("--host", dest="host", metavar="HOST",
+                        default='localhost',
+                        help="Listen on HOST for connections")
+    argprs.add_argument("--log", dest="logfile", metavar="FILE",
+                        help="Write logging output to FILE")
+    argprs.add_argument("--loglevel", dest="loglevel", metavar="LEVEL",
+                        type=int, default=logging.INFO,
+                        help="Set logging level to LEVEL")
+    argprs.add_argument("--port", dest="port", metavar="PORT",
+                        type=int, default=9909,
+                        help="Listen on PORT for connections")
+    argprs.add_argument("--profile", dest="profile", action="store_true",
+                        default=False,
+                        help="Run the profiler on main()")
+    argprs.add_argument("-r", "--renderer", dest="renderer", metavar="NAME",
+                        default=None,
+                        help="Choose renderer (pil|agg|opencv|cairo)")
+    argprs.add_argument("--stderr", dest="logstderr", default=False,
+                        action="store_true",
+                        help="Copy logging also to stderr")
+    argprs.add_argument("-t", "--toolkit", dest="toolkit", metavar="NAME",
+                        default='qt',
+                        help="Choose GUI toolkit (gtk|qt)")
+
+    (options, args) = argprs.parse_known_args(sys.argv[1:])
+
+    # Are we debugging this?
+    if options.debug:
+        import pdb
+
+        pdb.run('main(options, args)')
+
+    # Are we profiling this?
+    elif options.profile:
+        import profile
+
+        print(("%s profile:" % sys.argv[0]))
+        profile.run('main(options, args)')
+
+    else:
+        main(options, args)
