@@ -34,10 +34,6 @@ class FitsViewer(object):
         self.top = window
         self.top.add_callback('close', self.closed)
 
-        hbox = Widgets.HBox()
-        hbox.set_margins(2, 2, 2, 2)
-        hbox.set_spacing(1)
-
         vbox = Widgets.VBox()
         vbox.set_margins(2, 2, 2, 2)
         vbox.set_spacing(1)
@@ -56,137 +52,113 @@ class FitsViewer(object):
         self.bd = fi.get_bindings()
         self.bd.enable_all(True)
 
-        fi.set_desired_size(600, 600)
+        fi.set_desired_size(512, 512)
         w = Viewers.GingaViewerWidget(viewer=fi)
         vbox.add_widget(w, stretch=1)
 
-        hbox_b = Widgets.HBox()
-        hbox_b.set_margins(2, 2, 2, 2)
-        hbox_b.set_spacing(4)
+        hbox = Widgets.HBox()
+        hbox.set_margins(2, 2, 2, 2)
+        hbox.set_spacing(4)
 
         self.image_info = Widgets.Label("Image: ")
-        hbox_b.add_widget(self.image_info, stretch=1)
+        hbox.add_widget(self.image_info, stretch=1)
 
         self.wcut = Widgets.ComboBox()
         for name in fi.get_autocut_methods():
             self.wcut.append_text(name)
         self.wcut.add_callback('activated', self.cut_change)
-        hbox_b.add_widget(self.wcut, stretch=1)
+        hbox.add_widget(self.wcut, stretch=1)
 
         self.wcolor = Widgets.ComboBox()
         for name in fi.get_color_algorithms():
             self.wcolor.append_text(name)
         self.wcolor.add_callback('activated', self.color_change)
-        hbox_b.add_widget(self.wcolor, stretch=1)
+        hbox.add_widget(self.wcolor, stretch=1)
 
-        vbox.add_widget(hbox_b, stretch=0)
+        vbox.add_widget(hbox, stretch=0)
 
-        hbox_b = Widgets.HBox()
-        hbox_b.set_margins(2, 2, 2, 2)
-        hbox_b.set_spacing(4)
+        hbox = Widgets.HBox()
+        hbox.set_margins(2, 2, 2, 2)
+        hbox.set_spacing(4)
 
         self.cursorReadout = Widgets.Label("X:                 Y:                    Value:")
-        hbox_b.add_widget(self.cursorReadout, stretch=1)
+        hbox.add_widget(self.cursorReadout, stretch=1)
 
         self.ann_readout = Widgets.Label("Sum: ")
-        hbox_b.add_widget(self.ann_readout, stretch=1)
+        hbox.add_widget(self.ann_readout, stretch=1)
 
-        vbox.add_widget(hbox_b, stretch=0)
+        vbox.add_widget(hbox, stretch=0)
 
-        hbox.add_widget(vbox, stretch=0)
+        hbox = Widgets.HBox()
+        hbox.set_margins(2, 2, 2, 2)
+        hbox.set_spacing(4)
 
-        vbox = Widgets.VBox()
-        vbox.set_margins(2, 2, 2, 2)
-        vbox.set_spacing(5)
-
-        dir_label = Widgets.Label("Select Directory")
-        vbox.add_widget(dir_label)
-
-        wblue = Widgets.RadioButton("Blue")
-        wblue.add_callback('activated', lambda w, val: self.set_directory('Blue', val))
-        vbox.add_widget(wblue)
-
-        wgreen = Widgets.RadioButton("Green", group=wblue)
-        wgreen.add_callback('activated', lambda w, val: self.set_directory('Green', val))
-        vbox.add_widget(wgreen)
-
-        wred = Widgets.RadioButton("Red", group=wblue)
-        wred.add_callback('activated', lambda w, val: self.set_directory('Red', val))
-        vbox.add_widget(wred)
+        vbox_b = Widgets.VBox()
+        vbox_b.set_margins(2, 2, 2, 2)
+        vbox_b.set_spacing(1)
 
         self.wsettarget = Widgets.Button("Set Target")
         self.wsettarget.add_callback('activated', self.set_target)
         self.wsettarget.set_enabled(False)
-        vbox.add_widget(self.wsettarget, stretch=1)
-
-        self.targ_info = Widgets.Label("Target Instrument Mag: ")
-        vbox.add_widget(self.targ_info, stretch=1)
+        vbox_b.add_widget(self.wsettarget, stretch=1)
 
         self.wsetcompanion = Widgets.Button("Set Companion")
         self.wsetcompanion.add_callback('activated', self.set_companion)
         self.wsetcompanion.set_enabled(False)
-        vbox.add_widget(self.wsetcompanion, stretch=1)
-
-        self.companion_info = Widgets.Label("Companion Instrument Mag: ")
-        vbox.add_widget(self.companion_info, stretch=1)
+        vbox_b.add_widget(self.wsetcompanion, stretch=1)
 
         self.wcalculatemag = Widgets.Button("Calculate\n"
 "Magnitude")
         self.wcalculatemag.add_callback('activated', self.calc_mag)
-        vbox.add_widget(self.wcalculatemag, stretch=1)
+        vbox_b.add_widget(self.wcalculatemag, stretch=1)
+
+        hbox.add_widget(vbox_b, stretch=1)
+
+        vbox_b = Widgets.VBox()
+        vbox_b.set_margins(2, 2, 2, 2)
+        vbox_b.set_spacing(1)
+
+        self.targ_info = Widgets.Label("Target Instrument Mag: ")
+        vbox_b.add_widget(self.targ_info, stretch=1)
+
+        self.companion_info = Widgets.Label("Companion Instrument Mag: ")
+        vbox_b.add_widget(self.companion_info, stretch=1)
 
         self.target_mag = Widgets.Label("Target Magnitude: ")
-        vbox.add_widget(self.target_mag, stretch=1)
+        vbox_b.add_widget(self.target_mag, stretch=1)
 
         self.wrecord = Widgets.Button("Record Mag")
         self.wrecord.add_callback('activated', self.record)
         self.wrecord.set_enabled(False)
-        vbox.add_widget(self.wrecord, stretch=1)
+        vbox_b.add_widget(self.wrecord, stretch=1)
+
+        hbox.add_widget(vbox_b, stretch=1)
+
+        vbox_b = Widgets.VBox()
+        vbox_b.set_margins(2, 2, 2, 2)
+        vbox_b.set_spacing(1)
+
+        self.wopendirectory = Widgets.Button("Open Directory")
+        self.wopendirectory.add_callback('activated', self.open_directory)
+        vbox_b.add_widget(self.wopendirectory, stretch=1)
 
         self.wnextimage = Widgets.Button("Next Image >")
         self.wnextimage.add_callback('activated', self.next_image)
         self.wnextimage.set_enabled(False)
-        vbox.add_widget(self.wnextimage, stretch=1)
+        vbox_b.add_widget(self.wnextimage, stretch=1)
 
         self.wpreviousimage = Widgets.Button("< Previous Image")
         self.wpreviousimage.add_callback('activated', self.previous_image)
         self.wpreviousimage.set_enabled(False)
-        vbox.add_widget(self.wpreviousimage, stretch=1)
+        vbox_b.add_widget(self.wpreviousimage, stretch=1)
 
-        hbox.add_widget(vbox, stretch=1)
+        hbox.add_widget(vbox_b, stretch=1)
 
-        vbox = Widgets.VBox()
-        vbox.set_margins(2, 2, 2, 2)
-        vbox.set_spacing(1)
+        vbox.add_widget(hbox, stretch=0)
 
-        #Spacer Zone
-
-        spacer = Widgets.Label("")
-        vbox.add_widget(spacer, stretch=1)
-
-        hbox.add_widget(vbox, stretch=1)
-
-        spacer = Widgets.Label("")
-        vbox.add_widget(spacer, stretch=1)
-
-        hbox.add_widget(vbox, stretch=1)
-
-        spacer = Widgets.Label("")
-        vbox.add_widget(spacer, stretch=1)
-
-        hbox.add_widget(vbox, stretch=1)
-
-        spacer = Widgets.Label("")
-        vbox.add_widget(spacer, stretch=1)
-
-        hbox.add_widget(vbox, stretch=1)
-
-        spacer = Widgets.Label("")
-        vbox.add_widget(spacer, stretch=1)
-
-        hbox.add_widget(vbox, stretch=1)
-
-        #End Spacer Zone
+        hbox = Widgets.HBox()
+        hbox.add_widget(vbox, stretch=0)
+        hbox.add_widget(Widgets.Label(''), stretch=1)
 
         self.top.set_widget(hbox)
 
@@ -222,8 +194,10 @@ class FitsViewer(object):
         #                                fontsize=8))
         self.bd._orient(self.fitsimage, righthand=False, msg=True)
 
-    def set_directory(self, dir, val):
-        res = f'C:/Users/johnp/Desktop/TOMPhotom/SN2022hrsData/{dir}'
+    def open_directory(self, clicked):
+        #TODO add option to choose
+        # res = Widgets.QFileDialog.getExistingDirectory(self, "Select Directory")
+        res = 'C:/Users/johnp/Desktop/TOMPhotom/SN2022hrsData/Blue'
         files = os.listdir(res)
         file_list = []
         for file in files:
@@ -235,7 +209,6 @@ class FitsViewer(object):
         text = f"Image: {os.path.basename(self.file_list[self.image_index])}"
         self.image_info.set_text(text)
         self.wnextimage.set_enabled(True)
-        self.wpreviousimage.set_enabled(False)
 
     def next_image(self, clicked):
         self.reset_gui()
@@ -424,7 +397,7 @@ class FitsViewer(object):
         except AttributeError:
             return
         self.targ_mag = -2.5*np.log10(target_sum/90.)
-        text = f"Target Instrument Mag: {self.targ_mag:.2f}"
+        text = f"Target Sum: {self.targ_mag:.2f}"
         self.targ_info.set_text(text)
         try:
             self.fitsimage.get_canvas().get_object_by_tag(self.anntargtag)
