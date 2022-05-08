@@ -42,6 +42,27 @@ class FitsViewer(object):
         vbox.set_margins(2, 2, 2, 2)
         vbox.set_spacing(1)
 
+        inst = "Instructions:"
+
+        instructions = Widgets.Label(inst)
+        vbox.add_widget(instructions)
+
+        inst = "1. Click on one of the colors to select the directory."
+
+        instructions = Widgets.Label(inst)
+        vbox.add_widget(instructions)
+
+        inst = "2. Mark a star"
+
+        instructions = Widgets.Label(inst)
+        vbox.add_widget(instructions)
+
+        hbox.add_widget(vbox)
+
+        vbox = Widgets.VBox()
+        vbox.set_margins(2, 2, 2, 2)
+        vbox.set_spacing(1)
+
         # create the ginga viewer and configure it
         fi = Viewers.CanvasView(logger)
         fi.enable_autocuts('on')
@@ -187,7 +208,6 @@ class FitsViewer(object):
         hbox.add_widget(vbox, stretch=1)
 
         #End Spacer Zone
-
         self.top.set_widget(hbox)
 
         fi.set_callback('cursor-changed', self.motion_cb)
@@ -195,6 +215,7 @@ class FitsViewer(object):
         self.anndc, self.circdc = self.add_canvas()
         self.anntag = "annulus-tag"
         self.circtag = "circle-tag"
+        self.datashapetag = "data-tag"
         self.anntargtag = "target-annulus-tag"
         self.circtargtag = "target-circle-tag"
         self.anncomptag = "companion-annulus-tag"
@@ -223,6 +244,7 @@ class FitsViewer(object):
         self.bd._orient(self.fitsimage, righthand=False, msg=True)
 
     def set_directory(self, dir, val):
+        self.reset_gui()
         res = f'C:/Users/johnp/Desktop/TOMPhotom/SN2022hrsData/{dir}'
         files = os.listdir(res)
         file_list = []
@@ -277,6 +299,8 @@ class FitsViewer(object):
             self.fitsimage.get_canvas().delete_object_by_tag(self.anntag)
             self.fitsimage.get_canvas().get_object_by_tag(self.circtag)
             self.fitsimage.get_canvas().delete_object_by_tag(self.circtag)
+            self.fitsimage.get_canvas().get_object_by_tag(self.datashapetag)
+            self.fitsimage.get_canvas().delete_object_by_tag(self.datashapetag)
         except KeyError:
             pass
         self.targ_info.set_text("Target Instrument Mag: ")
@@ -343,10 +367,11 @@ class FitsViewer(object):
     ##Find star stuff
     def cutdetail(self, image, shape_obj):
         view, mask = image.get_shape_view(shape_obj)
-
         data = image._slice(view)
+        start_x = view[1].start
+        start_y = view[0].start
 
-        return data
+        return data, start_x, start_y
 
     # def backdetail(self, image, x, y):
     #     obj = self.pickannulus
@@ -358,9 +383,7 @@ class FitsViewer(object):
 
 
     def findstar(self, image, shape):
-        # obj = self.circdc(self.xclick, self.yclick, 60, color='red')
-        # shape = obj
-        data = self.cutdetail(image, shape)
+        data, start_x, start_y = self.cutdetail(image, shape)
         ht, wd = data.shape[:2]
         xc, yc = wd // 2, ht // 2
         radius = min(xc, yc)
@@ -370,16 +393,14 @@ class FitsViewer(object):
                                               radius=radius)
 
         xc, yc = peaks[0]
-        xc += 1
-        yc += 1
+        xc = xc + 1 + start_x
+        yc = yc + 1 + start_y
         return int(xc), int(yc), data
 
     def staraperature(self, xc, yc, image):
         positions = np.transpose((xc, yc))
         aperture = CircularAperture(positions, r=6.)
         annulus_aperture = CircularAnnulus(positions, r_in=12., r_out=15.)
-        # back_table = aperture_photometry(background, annulus_aperture)
-        # print(back_table)
         apers = [aperture, annulus_aperture]
         phot_table = aperture_photometry(image, apers)
         bkg_mean = phot_table['aperture_sum_1'] / annulus_aperture.area
@@ -390,30 +411,40 @@ class FitsViewer(object):
             phot_table[col].info.format = '%.8g'  # for consistent table output
         return phot_table[0]["residual_aperture_sum"]
 
-    def pickstar(self):
+    def set_picking(self, x, y):
         try:
             self.fitsimage.get_canvas().get_object_by_tag(self.anntag)
             self.fitsimage.get_canvas().delete_object_by_tag(self.anntag)
             self.fitsimage.get_canvas().get_object_by_tag(self.circtag)
             self.fitsimage.get_canvas().delete_object_by_tag(self.circtag)
-            self.pickcircle = self.circdc(self.xclick, self.yclick, 6, color='red')
-            self.pickannulus = self.anndc(self.xclick, self.yclick, 12, 3)
+            self.fitsimage.get_canvas().get_object_by_tag(self.datashapetag)
+            self.fitsimage.get_canvas().delete_object_by_tag(self.datashapetag)
+            self.pickcircle = self.circdc(x, y, 6, color='red')
+            self.data_shape = self.circdc(x, y, 15)
+            self.pickannulus = self.anndc(x, y, 12, 3)
             self.fitsimage.get_canvas().add(self.pickcircle, tag=self.circtag, redraw=True)
             self.fitsimage.get_canvas().add(self.pickannulus, tag=self.anntag, redraw=True)
         except KeyError:
-            self.pickcircle = self.circdc(self.xclick, self.yclick, 6, color='red')
-            self.pickannulus = self.anndc(self.xclick, self.yclick, 12, 3)
+            self.pickcircle = self.circdc(x, y, 6, color='red')
+            self.data_shape = self.circdc(x, y, 15)
+            self.pickannulus = self.anndc(x, y, 12, 3)
             self.fitsimage.get_canvas().add(self.pickcircle, tag=self.circtag, redraw=True)
+            self.fitsimage.get_canvas().add(self.data_shape, tag=self.datashapetag, redraw=True)
             self.fitsimage.get_canvas().add(self.pickannulus, tag=self.anntag, redraw=True)
+
+
+    def pickstar(self):
         image = self.fitsimage.get_image()
         try:
-            # data_shape = self.circdc(self.xclick, self.yclick, 60, color='red')
-            xc, yc, data = self.findstar(image, self.pickcircle)
-            # back_data = self.backdetail(image, xc, yc)
-            sum = self.staraperature(self.xclick, self.yclick, image.get_data())
+            xc, yc, data = self.findstar(image, self.data_shape)
+            self.xcenter = xc
+            self.ycenter = yc
+            sum = self.staraperature(xc, yc, image.get_data())
+
             text = f"Sum: {sum:.2f}"
             self.app_sum = sum
             self.ann_readout.set_text(text)
+            self.set_picking(self.xcenter, self.ycenter)
         except IndexError:
             text = "Sum: N/A"
             self.ann_readout.set_text(text)
@@ -423,7 +454,10 @@ class FitsViewer(object):
             target_sum = self.app_sum
         except AttributeError:
             return
-        self.targ_mag = -2.5*np.log10(target_sum/90.)
+        exptime = 90.
+        if 'B' in self.image_info.get_text():
+            exptime = 120.
+        self.targ_mag = -2.5*np.log10(target_sum/exptime)
         text = f"Target Instrument Mag: {self.targ_mag:.2f}"
         self.targ_info.set_text(text)
         try:
@@ -431,13 +465,13 @@ class FitsViewer(object):
             self.fitsimage.get_canvas().delete_object_by_tag(self.anntargtag)
             self.fitsimage.get_canvas().get_object_by_tag(self.circtargtag)
             self.fitsimage.get_canvas().delete_object_by_tag(self.circtargtag)
-            self.picktargcircle = self.circdc(self.xclick, self.yclick, 6, color='blue')
-            self.picktargannulus = self.anndc(self.xclick, self.yclick, 12, 3, color='blue')
+            self.picktargcircle = self.circdc(self.xcenter, self.ycenter, 6, color='blue')
+            self.picktargannulus = self.anndc(self.xcenter, self.ycenter, 12, 3, color='blue')
             self.fitsimage.get_canvas().add(self.picktargcircle, tag=self.circtargtag, redraw=True)
             self.fitsimage.get_canvas().add(self.picktargannulus, tag=self.anntargtag, redraw=True)
         except KeyError:
-            self.picktargcircle = self.circdc(self.xclick, self.yclick, 6, color='blue')
-            self.picktargannulus = self.anndc(self.xclick, self.yclick, 12, 3, color='blue')
+            self.picktargcircle = self.circdc(self.xcenter, self.ycenter, 6, color='blue')
+            self.picktargannulus = self.anndc(self.xcenter, self.ycenter, 12, 3, color='blue')
             self.fitsimage.get_canvas().add(self.picktargcircle, tag=self.circtargtag, redraw=True)
             self.fitsimage.get_canvas().add(self.picktargannulus, tag=self.anntargtag, redraw=True)
 
@@ -446,7 +480,10 @@ class FitsViewer(object):
             companion_sum = self.app_sum
         except AttributeError:
             return
-        self.comp_mag = -2.5*np.log10(companion_sum/90.)
+        exptime = 90.
+        if 'B' in self.image_info.get_text():
+            exptime = 120.
+        self.comp_mag = -2.5*np.log10(companion_sum/exptime)
         text = f"Companion Sum: {self.comp_mag:.2f}"
         self.companion_info.set_text(text)
         try:
@@ -454,13 +491,13 @@ class FitsViewer(object):
             self.fitsimage.get_canvas().delete_object_by_tag(self.anncomptag)
             self.fitsimage.get_canvas().get_object_by_tag(self.circcomptag)
             self.fitsimage.get_canvas().delete_object_by_tag(self.circcomptag)
-            self.pickcompcircle = self.circdc(self.xclick, self.yclick, 6, color='green')
-            self.pickcompannulus = self.anndc(self.xclick, self.yclick, 12, 3, color='green')
+            self.pickcompcircle = self.circdc(self.xcenter, self.ycenter, 6, color='green')
+            self.pickcompannulus = self.anndc(self.xcenter, self.ycenter, 12, 3, color='green')
             self.fitsimage.get_canvas().add(self.pickcompcircle, tag=self.circcomptag, redraw=True)
             self.fitsimage.get_canvas().add(self.pickcompannulus, tag=self.anncomptag, redraw=True)
         except KeyError:
-            self.pickcompcircle = self.circdc(self.xclick, self.yclick, 6, color='green')
-            self.pickcompannulus = self.anndc(self.xclick, self.yclick, 12, 3, color='green')
+            self.pickcompcircle = self.circdc(self.xcenter, self.ycenter, 6, color='green')
+            self.pickcompannulus = self.anndc(self.xcenter, self.ycenter, 12, 3, color='green')
             self.fitsimage.get_canvas().add(self.pickcompcircle, tag=self.circcomptag, redraw=True)
             self.fitsimage.get_canvas().add(self.pickcompannulus, tag=self.anncomptag, redraw=True)
 
@@ -492,10 +529,9 @@ class FitsViewer(object):
 
     def btndown(self, canvas, event, data_x, data_y):
         # self.fitsimage.set_pan(data_x, data_y)
-        self.xclick = data_x
-        self.yclick = data_y
         self.wsettarget.set_enabled(True)
         self.wsetcompanion.set_enabled(True)
+        self.set_picking(data_x, data_y)
         self.pickstar()
 
     def closed(self, w):
