@@ -92,6 +92,7 @@ class FitsViewer(object):
         for name in fi.get_autocut_methods():
             self.wcut.append_text(name)
         self.wcut.add_callback('activated', self.cut_change)
+        self.wcut.setCurrentText('zscale')
         hbox_b.add_widget(self.wcut, stretch=1)
 
         self.wcolor = Widgets.ComboBox()
