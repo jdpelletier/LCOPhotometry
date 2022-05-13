@@ -7,6 +7,7 @@ import subprocess
 import datetime
 import time
 import logging
+import string
 
 import numpy as np
 from astropy.io import fits
@@ -34,30 +35,12 @@ class FitsViewer(object):
         self.top = window
         self.top.add_callback('close', self.closed)
 
+        self.file_list = []
+        self.image_index = 0
+
         hbox = Widgets.HBox()
         hbox.set_margins(2, 2, 2, 2)
         hbox.set_spacing(1)
-
-        vbox = Widgets.VBox()
-        vbox.set_margins(2, 2, 2, 2)
-        vbox.set_spacing(1)
-
-        inst = "Instructions:"
-
-        instructions = Widgets.Label(inst)
-        vbox.add_widget(instructions)
-
-        inst = "1. Click on one of the colors to select the directory."
-
-        instructions = Widgets.Label(inst)
-        vbox.add_widget(instructions)
-
-        inst = "2. Mark a star"
-
-        instructions = Widgets.Label(inst)
-        vbox.add_widget(instructions)
-
-        hbox.add_widget(vbox)
 
         vbox = Widgets.VBox()
         vbox.set_margins(2, 2, 2, 2)
@@ -92,7 +75,7 @@ class FitsViewer(object):
         for name in fi.get_autocut_methods():
             self.wcut.append_text(name)
         self.wcut.add_callback('activated', self.cut_change)
-        self.wcut.setCurrentText('zscale')
+        self.wcut.set_text('zscale')
         hbox_b.add_widget(self.wcut, stretch=1)
 
         self.wcolor = Widgets.ComboBox()
@@ -121,8 +104,10 @@ class FitsViewer(object):
         vbox.set_margins(2, 2, 2, 2)
         vbox.set_spacing(5)
 
-        dir_label = Widgets.Label("Select Directory")
-        vbox.add_widget(dir_label)
+        inst = "Select a directory."
+
+        instructions = Widgets.Label(inst)
+        vbox.add_widget(instructions)
 
         wblue = Widgets.RadioButton("Blue")
         wblue.add_callback('activated', lambda w, val: self.set_directory('Blue', val))
@@ -136,44 +121,140 @@ class FitsViewer(object):
         wred.add_callback('activated', lambda w, val: self.set_directory('Red', val))
         vbox.add_widget(wred)
 
-        self.wsettarget = Widgets.Button("Set Target")
+        inst = "Images:"
+
+        instructions = Widgets.Label(inst)
+        vbox.add_widget(instructions)
+
+        hbox_b = Widgets.HBox()
+        hbox_b.set_margins(2, 2, 2, 2)
+        hbox_b.set_spacing(4)
+
+        self.wimages = Widgets.ComboBox()
+        self.wimages.add_callback('activated', self.select_image)
+        hbox_b.add_widget(self.wimages, stretch=1)
+
+        for i in range(5):
+            spacer = Widgets.Label("")
+            hbox_b.add_widget(spacer, stretch=1)
+
+        vbox.add_widget(hbox_b, stretch=0)
+
+        inst = "To zoom, use + or -."
+
+        instructions = Widgets.Label(inst)
+        vbox.add_widget(instructions)
+
+        inst = "To pan, hold ctrl, click and drag."
+
+        instructions = Widgets.Label(inst)
+        vbox.add_widget(instructions)
+
+
+        brk = "__________________________________________________________________________"
+        brk_label = Widgets.Label(brk)
+        vbox.add_widget(brk_label)
+
+        inst = "Click on the target.  It will automatically center the annulus. Then, click SET TARGET."
+
+        instructions = Widgets.Label(inst)
+        vbox.add_widget(instructions)
+
+        hbox_b = Widgets.HBox()
+        hbox_b.set_margins(2, 2, 2, 2)
+        hbox_b.set_spacing(4)
+
+        self.wsettarget = Widgets.Button("SET TARGET")
         self.wsettarget.add_callback('activated', self.set_target)
         self.wsettarget.set_enabled(False)
-        vbox.add_widget(self.wsettarget, stretch=1)
+        hbox_b.add_widget(self.wsettarget, stretch=1)
 
-        self.targ_info = Widgets.Label("Target Instrument Mag: ")
+        for i in range(5):
+            spacer = Widgets.Label("")
+            hbox_b.add_widget(spacer, stretch=1)
+
+        vbox.add_widget(hbox_b, stretch=0)
+
+        self.targ_info = Widgets.Label("Target Instrument Magnitude: ")
         vbox.add_widget(self.targ_info, stretch=1)
 
-        self.wsetcompanion = Widgets.Button("Set Companion")
+        vbox.add_widget(brk_label)
+
+        inst = "Click on the companion star.  It will automatically center the annulus. Then, click SET COMPANION."
+
+        instructions = Widgets.Label(inst)
+        vbox.add_widget(instructions)
+
+        inst = "NOTE: You must select the correct companion star.  See finder chart."
+
+        instructions = Widgets.Label(inst)
+        vbox.add_widget(instructions)
+
+        hbox_b = Widgets.HBox()
+        hbox_b.set_margins(2, 2, 2, 2)
+        hbox_b.set_spacing(4)
+
+        self.wsetcompanion = Widgets.Button("SET COMPANION")
         self.wsetcompanion.add_callback('activated', self.set_companion)
         self.wsetcompanion.set_enabled(False)
-        vbox.add_widget(self.wsetcompanion, stretch=1)
+        hbox_b.add_widget(self.wsetcompanion, stretch=1)
 
-        self.companion_info = Widgets.Label("Companion Instrument Mag: ")
+        for i in range(7):
+            spacer = Widgets.Label("")
+            hbox_b.add_widget(spacer, stretch=1)
+
+        vbox.add_widget(hbox_b, stretch=0)
+
+        self.companion_info = Widgets.Label("Companion Instrument Magnitude: ")
         vbox.add_widget(self.companion_info, stretch=1)
 
-        self.wcalculatemag = Widgets.Button("Calculate\n"
-"Magnitude")
-        self.wcalculatemag.add_callback('activated', self.calc_mag)
-        vbox.add_widget(self.wcalculatemag, stretch=1)
+        vbox.add_widget(brk_label)
 
-        self.target_mag = Widgets.Label("Target Magnitude: ")
+        inst = "Once you have set the target and the compantion, click CALCULATE MAGNITUDE."
+
+        instructions = Widgets.Label(inst)
+        vbox.add_widget(instructions)
+
+        hbox_b = Widgets.HBox()
+        hbox_b.set_margins(2, 2, 2, 2)
+        hbox_b.set_spacing(4)
+
+        self.wcalculatemag = Widgets.Button("CALCULATE\n"
+"MAGNITUDE")
+        self.wcalculatemag.add_callback('activated', self.calc_mag)
+        hbox_b.add_widget(self.wcalculatemag, stretch=1)
+
+        for i in range(5):
+            spacer = Widgets.Label("")
+            hbox_b.add_widget(spacer, stretch=1)
+
+        vbox.add_widget(hbox_b, stretch=0)
+
+        self.file_date = Widgets.Label('Modified Julian Date')
+        vbox.add_widget(self.file_date, stretch=1)
+
+        self.target_mag = Widgets.Label('Target Magnitude: ')
         vbox.add_widget(self.target_mag, stretch=1)
 
-        self.wrecord = Widgets.Button("Record Mag")
-        self.wrecord.add_callback('activated', self.record)
-        self.wrecord.set_enabled(False)
-        vbox.add_widget(self.wrecord, stretch=1)
-
-        self.wnextimage = Widgets.Button("Next Image >")
-        self.wnextimage.add_callback('activated', self.next_image)
-        self.wnextimage.set_enabled(False)
-        vbox.add_widget(self.wnextimage, stretch=1)
+        hbox_b = Widgets.HBox()
+        hbox_b.set_margins(2, 2, 2, 2)
+        hbox_b.set_spacing(4)
 
         self.wpreviousimage = Widgets.Button("< Previous Image")
         self.wpreviousimage.add_callback('activated', self.previous_image)
         self.wpreviousimage.set_enabled(False)
-        vbox.add_widget(self.wpreviousimage, stretch=1)
+        hbox_b.add_widget(self.wpreviousimage, stretch=1)
+
+        self.wnextimage = Widgets.Button("Next Image >")
+        self.wnextimage.add_callback('activated', self.next_image)
+        self.wnextimage.set_enabled(False)
+        hbox_b.add_widget(self.wnextimage, stretch=1)
+
+        for i in range(5):
+            spacer = Widgets.Label("")
+            hbox_b.add_widget(spacer, stretch=1)
+
+        vbox.add_widget(hbox_b, stretch=0)
 
         hbox.add_widget(vbox, stretch=1)
 
@@ -222,6 +303,7 @@ class FitsViewer(object):
         self.anncomptag = "companion-annulus-tag"
         self.circcomptag = "companion-circle-tag"
 
+
     def add_canvas(self, tag=None):
         # add a canvas to the view
         my_canvas = self.fitsimage.get_canvas()
@@ -259,6 +341,11 @@ class FitsViewer(object):
         self.image_info.set_text(text)
         self.wnextimage.set_enabled(True)
         self.wpreviousimage.set_enabled(False)
+        self.wimages.clear()
+        for name in self.file_list:
+            self.wimages.insert_alpha(f"{os.path.basename(name)}")
+        self.wimages.set_text(f"{os.path.basename(self.file_list[self.image_index])}")
+
 
     def next_image(self, clicked):
         self.reset_gui()
@@ -279,6 +366,18 @@ class FitsViewer(object):
         self.wnextimage.set_enabled(True)
         if self.image_index == 0:
             self.wpreviousimage.set_enabled(False)
+
+    def select_image(self, activated, idk):
+        self.reset_gui()
+        self.image_index = idk
+        self.load_file(self.file_list[idk])
+        text = f"Image: {os.path.basename(self.file_list[self.image_index])}"
+        self.image_info.set_text(text)
+        self.wnextimage.set_enabled(True)
+        if self.image_index == 0:
+            self.wpreviousimage.set_enabled(False)
+        if self.image_index == self.max_index:
+            self.wnextimage.set_enabled(False)
 
     def reset_gui(self):
         try:
@@ -304,8 +403,9 @@ class FitsViewer(object):
             self.fitsimage.get_canvas().delete_object_by_tag(self.datashapetag)
         except KeyError:
             pass
-        self.targ_info.set_text("Target Instrument Mag: ")
-        self.companion_info.set_text("Companion Instrument Mag: ")
+        self.targ_info.set_text("Target Instrument Magnitude: ")
+        self.companion_info.set_text("Companion Instrument Magnitude: ")
+        self.file_date.set_text("Modified Julian Date: ")
         self.target_mag.set_text("Target Magnitude: ")
         self.ann_readout.set_text("Sum: ")
         self.wsettarget.set_enabled(False)
@@ -373,14 +473,6 @@ class FitsViewer(object):
         start_y = view[0].start
 
         return data, start_x, start_y
-
-    # def backdetail(self, image, x, y):
-    #     obj = self.pickannulus
-    #     data = self.cutdetail(image, obj)
-    #     circ = self.circdc(x, y, 40, color='red')
-    #     circdata = self.cutdetail(image, circ)
-    #     ann_data = data - circdata
-    #     return ann_data
 
 
     def findstar(self, image, shape):
@@ -485,7 +577,7 @@ class FitsViewer(object):
         if 'B' in self.image_info.get_text():
             exptime = 120.
         self.comp_mag = -2.5*np.log10(companion_sum/exptime)
-        text = f"Companion Sum: {self.comp_mag:.2f}"
+        text = f"Companion Instrument Magnitude: {self.comp_mag:.2f}"
         self.companion_info.set_text(text)
         try:
             self.fitsimage.get_canvas().get_object_by_tag(self.anncomptag)
@@ -515,17 +607,21 @@ class FitsViewer(object):
             companion_ab = 11.8
         mag = diff + companion_ab
         self.calc_mag = mag
+        name = self.image_info.get_text().replace(".fits.fz", "").replace("Image: ", "").replace("B", "").replace("rp", "").replace("V", "").replace("-", ".")
+        text = f"Modified Julian Date:  {name}\n"
+        self.file_date.set_text(text)
         text = f"Target Magnitude: {mag:.2f}"
         self.target_mag.set_text(text)
-        self.wrecord.set_enabled(True)
+        # self.wcopy.set_enabled(True)
 
-    def record(self, clicked):
-        name = self.image_info.get_text().replace(".fits.fz", "").replace("Image: ", "").replace("B", "").replace("rp", "").replace("V", "").replace("-", ".")
-        point = f"{name} {self.calc_mag}"
-        with open('outfile.txt', 'a') as fp:
-            fp.write(point)
-            fp.write('\n')
-        self.wrecord.set_enabled(False)
+    # def copy_mag(self, clicked):
+    #     name = self.image_info.get_text().replace(".fits.fz", "").replace("Image: ", "").replace("B", "").replace("rp", "").replace("V", "").replace("-", ".")
+    #     point = f"{name}\t{self.calc_mag}"
+    #     pyperclip.copy(point)
+        # with open('outfile.txt', 'a') as fp:
+        #     fp.write(point)
+        #     fp.write('\n')
+        # self.wcopy.set_enabled(False)
 
 
     def btndown(self, canvas, event, data_x, data_y):
@@ -552,7 +648,7 @@ def main(options, args):
     app = Widgets.Application(logger=logger,
                               host=options.host, port=options.port)
 
-    window = app.make_window("Ginga web example2")
+    window = app.make_window("SN2022hrs Photometry")
 
     # our own viewer object, customized with methods (see above)
     viewer = FitsViewer(logger, window)
@@ -584,7 +680,7 @@ if __name__ == "__main__":
     argprs.add_argument("--debug", dest="debug", default=False, action="store_true",
                         help="Enter the pdb debugger on main()")
     argprs.add_argument("--host", dest="host", metavar="HOST",
-                        default='localhost',
+                        default='192.168.1.95',
                         help="Listen on HOST for connections")
     argprs.add_argument("--log", dest="logfile", metavar="FILE",
                         help="Write logging output to FILE")
