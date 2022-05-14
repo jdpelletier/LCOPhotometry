@@ -680,7 +680,7 @@ if __name__ == "__main__":
     argprs.add_argument("--debug", dest="debug", default=False, action="store_true",
                         help="Enter the pdb debugger on main()")
     argprs.add_argument("--host", dest="host", metavar="HOST",
-                        default='192.168.1.95',
+                        default='192.168.1.182',
                         help="Listen on HOST for connections")
     argprs.add_argument("--log", dest="logfile", metavar="FILE",
                         help="Write logging output to FILE")
