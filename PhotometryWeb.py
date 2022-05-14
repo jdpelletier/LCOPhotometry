@@ -328,7 +328,7 @@ class FitsViewer(object):
 
     def set_directory(self, dir, val):
         self.reset_gui()
-        res = f'C:/Users/johnp/Desktop/TOMPhotom/SN2022hrsData/{dir}'
+        res = f'/home/pi/Desktop/Apps/SN2022hrsData/{dir}'
         files = os.listdir(res)
         file_list = []
         for file in files:
