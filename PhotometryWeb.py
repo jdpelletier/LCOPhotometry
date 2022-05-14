@@ -376,6 +376,7 @@ class FitsViewer(object):
         self.load_file(self.file_list[idk])
         text = f"Image: {os.path.basename(self.file_list[self.image_index])}"
         self.image_info.set_text(text)
+        self.wpreviousimage.set_enabled(True)
         self.wnextimage.set_enabled(True)
         if self.image_index == 0:
             self.wpreviousimage.set_enabled(False)
