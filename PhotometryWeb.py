@@ -354,6 +354,7 @@ class FitsViewer(object):
         text = f"Image: {os.path.basename(self.file_list[self.image_index])}"
         self.image_info.set_text(text)
         self.wpreviousimage.set_enabled(True)
+        self.wimages.set_text(f"{os.path.basename(self.file_list[self.image_index])}")
         if self.image_index == self.max_index:
             self.wnextimage.set_enabled(False)
 
@@ -364,6 +365,7 @@ class FitsViewer(object):
         text = f"Image: {os.path.basename(self.file_list[self.image_index])}"
         self.image_info.set_text(text)
         self.wnextimage.set_enabled(True)
+        self.wimages.set_text(f"{os.path.basename(self.file_list[self.image_index])}")
         if self.image_index == 0:
             self.wpreviousimage.set_enabled(False)
 
