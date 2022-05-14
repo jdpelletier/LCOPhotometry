@@ -330,6 +330,7 @@ class FitsViewer(object):
         self.reset_gui()
         res = f'/home/pi/Desktop/Apps/SN2022hrsData/{dir}'
         files = os.listdir(res)
+        files.sort()
         file_list = []
         for file in files:
             file_list.append(res + '/' + file)
